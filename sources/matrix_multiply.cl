@@ -39,3 +39,44 @@ kernel void matrix_multiply(
         result[pos_out] += mat1[pos_in1 + i] * mat2[pos_in2 + i];
     }
 }
+
+#define BLOCK_SIZE 8
+
+kernel __attribute__((reqd_work_group_size(BLOCK_SIZE, BLOCK_SIZE, 1)))
+void matrix_multiply_block(
+    global float* mat1,
+    global float* mat2,
+    global float* result,
+    uint pitch)
+{
+    // workgroup id
+    const int i = get_group_id(0);
+    const int j = get_group_id(1);
+    // workitem id
+    const int idX = get_local_id(0);
+    const int idY = get_local_id(1);
+    //matrices dimensions
+    int p = get_global_size(0);
+    int r = get_global_size(1);
+    const int qq = pitch;
+    // number of submatrices to be processes by each worker (Q dimension)
+    int numSubMat = qq / BLOCK_SIZE;
+    float4 resp = (float4)(0, 0, 0, 0);
+    local float A[BLOCK_SIZE][BLOCK_SIZE];
+    local float B[BLOCK_SIZE][BLOCK_SIZE];
+    for (int k = 0; k < numSubMat; k++) {
+        // copy submatrices to local memory. each worker copies one element
+        // Notice that A[i,k] accesses element starting from M[BLOCK_SIZE * i, BLOCK_SIZE * j]
+        A[idX][idY] = mat1[BLOCK_SIZE*i + idX + p*(BLOCK_SIZE*k+idY)];
+        B[idX][idY] = mat2[BLOCK_SIZE*k + idX + qq*(BLOCK_SIZE*j+idY)];
+        barrier(CLK_LOCAL_MEM_FENCE);
+        for (int k2 = 0; k2 < BLOCK_SIZE; k2+=4)
+        {
+            float4 temp1=(float4)(A[idX][k2],A[idX][k2+1],A[idX][k2+2],A[idX][k2+3]);
+            float4 temp2=(float4)(B[k2][idY],B[k2+1][idY],B[k2+2][idY],B[k2+3][idY]);
+            resp += temp1 * temp2;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    result[BLOCK_SIZE*i + idX + p*(BLOCK_SIZE*j+idY)] = resp.x+resp.y+resp.z+resp.w;
+}

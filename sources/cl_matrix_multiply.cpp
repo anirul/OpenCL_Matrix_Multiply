@@ -130,7 +130,7 @@ void cl_matrix_multiply::prepare(
         sizeof(cl_float) * result_size_);
     kernel_ = cl::Kernel(
         program_,
-        "matrix_multiply",
+        "matrix_multiply_block",
         &err_);
 }
 
@@ -145,7 +145,7 @@ std::chrono::duration<double> cl_matrix_multiply::run(std::vector<float>& out) {
         kernel_,
         cl::NullRange,
         cl::NDRange(mat1_size_ / pitch_, mat2_size_ / pitch_),
-        cl::NullRange,
+        cl::NDRange(8, 8),
         nullptr,
         &event_);
     queue_.finish();
