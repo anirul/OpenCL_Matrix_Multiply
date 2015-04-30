@@ -25,6 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <iostream>
+#include <string>
+#include <vector>
+#include <fstream>
 #include <stdexcept>
 #include "cl_matrix_multiply.hpp"
 
@@ -35,9 +39,9 @@ platform_id_(platform),
 device_id_(device)
 {
     std::vector<cl::Platform> platforms;
-    auto err = cl::Platform::get(platforms);
-    if (platforms.size() > platform_id_)
-        throw std::runtime_error("");
+    auto err = cl::Platform::get(&platforms);
+    if (platforms.size() <= platform_id_)
+        throw std::runtime_error("unknown platform");
     err = platforms[platform_id_].getDevices(CL_DEVICE_TYPE_ALL, &devices_);
     int i = 0;
     for (auto device : devices_) {
@@ -47,6 +51,8 @@ device_id_(device)
             << std::endl;
         i++;
     }
+    if (devices_.size() <= device_id_)
+        throw std::runtime_error("unknown device");
     std::cout << "device used     : " << device_id_ << std::endl;
     cl_context_properties properties[] = {
         CL_CONTEXT_PLATFORM,
@@ -54,7 +60,7 @@ device_id_(device)
         0
     };
     context_ = cl::Context(CL_DEVICE_TYPE_ALL, properties);
-    devices_ = constext_.getInfo<CL_CONTEXT_DEVICES>();
+    devices_ = context_.getInfo<CL_CONTEXT_DEVICES>();
     queue_ = cl::CommandQueue(context_, devices_[device_id_], 0, &err);
 }
 
@@ -72,7 +78,7 @@ void cl_matrix_multiply::init(const std::string& cl_file) {
         std::make_pair(
             kernel_source.c_str(),
             kernel_source.size()));
-    program_ = cl::Program(context_, source);
+    program_ = cl::Program(context_, sources);
     try {
         auto err = program_.build(devices_);
     } catch (cl::Error er) {
@@ -107,7 +113,7 @@ void cl_matrix_multiply::prepare(
         throw std::runtime_error("matrix 2 should be dividable by pitch");
     mat1_size_ = mat1.size();
     mat2_size_ = mat2.size();
-    result_size_ = (mat1_size_ / pitch) * (mat2_size / pitch);
+    result_size_ = (mat1_size_ / pitch_) * (mat2_size_ / pitch_);
     cl_buffer_mat1_ = cl::Buffer(
         context_,
         CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -122,8 +128,8 @@ void cl_matrix_multiply::prepare(
         context_,
         CL_MEM_READ_WRITE,
         sizeof(cl_float) * result_size_);
-    cl_kernel_ = cl::Kernel(
-        cl_program_,
+    kernel_ = cl::Kernel(
+        program_,
         "matrix_multiply",
         &err_);
 }
@@ -132,13 +138,13 @@ std::chrono::duration<double> cl_matrix_multiply::run(std::vector<float>& out) {
     kernel_.setArg(0, cl_buffer_mat1_);
     kernel_.setArg(1, cl_buffer_mat2_);
     kernel_.setArg(2, cl_buffer_result_);
-    kernel_.setArg(3, pitch_)
+    kernel_.setArg(3, pitch_);
     queue_.finish();
     auto start = std::chrono::system_clock::now();
     err_ = queue_.enqueueNDRangeKernel(
         kernel_,
         cl::NullRange,
-        cl::NDRange(mat1_size_ / pitch, mat2_size_ / pitch),
+        cl::NDRange(mat1_size_ / pitch_, mat2_size_ / pitch_),
         cl::NullRange,
         nullptr,
         &event_);

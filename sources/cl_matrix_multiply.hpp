@@ -29,6 +29,7 @@
 #include <string>
 #include <chrono>
 
+#define __CL_ENABLE_EXCEPTIONS
 #include "CL/cl.hpp"
 
 class cl_matrix_multiply {
@@ -42,6 +43,8 @@ private:
     cl::Kernel kernel_;
     std::vector<cl::Device> devices_;
     cl::Context context_;
+    cl::CommandQueue queue_;
+    cl::Event event_;
     cl_uint pitch_;
     cl_uint mat1_size_;
     cl_uint mat2_size_;

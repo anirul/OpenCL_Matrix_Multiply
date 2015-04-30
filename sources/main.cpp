@@ -29,23 +29,43 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <random>
 #include <boost/program_options.hpp>
 
 #include "cl_matrix_multiply.hpp"
 
 using namespace boost::program_options;
 
+const unsigned int NB_VALUES = 4096;
+const unsigned int PITCH = 128;
+
+void init_vector(std::vector<float>& y) {
+    const size_t elements = PITCH * NB_VALUES;
+    y.resize(elements);
+    std::uniform_real_distribution<float> distribution(-100.0f, 100.0f);
+    std::mt19937 engine; // Mersenne twister MT19937
+    auto generator = std::bind(distribution, engine);
+    std::generate_n(y.begin(), elements, generator);
+}
+
 int main(int ac, char** av) {
     unsigned int platform_id = 0;
     unsigned int device_id = 0;
+    std::string cl_file = "./matrix_multiply.cl";
+    std::vector<float> mat1;
+    init_vector(mat1);
+    std::vector<float> mat2;
+    init_vector(mat2);
+    std::vector<float> result;
+    result.resize(NB_VALUES * NB_VALUES);
     try {
         options_description desc("Allowed options");
-        desc.add_options
-        ()
-        ("help,h", "produce help message")
-        ("platform,p", value<unsigned int>(), "platform selection")
-        ("device,d", value<unsigned int>(), "device selection");
-        variable_map vm;
+        desc.add_options()
+            ("help,h", "produce help message")
+            ("cl-file,c", value<std::string>(), "cl file")
+            ("platform,p", value<unsigned int>(), "platform selection")
+            ("device,d", value<unsigned int>(), "device selection");
+        variables_map vm;
         store(command_line_parser(ac, av).options(desc).run(), vm);
         if (vm.count("help")) {
             std::cout << desc << std::endl;
@@ -58,8 +78,21 @@ int main(int ac, char** av) {
         if (vm.count("device")) {
             device_id = vm["device"].as<unsigned int>();
         }
+        if (vm.count("cl-file")) {
+            cl_file = vm["cl-file"].as<std::string>();
+        }
         std::cout << "device id       : " << device_id << std::endl;
-        // TODO instanciate and create the matrix multiply object 
+        std::cout << "cl file used    : " << cl_file << std::endl;
+        { // start the program
+            cl_matrix_multiply mm(platform_id, device_id);
+            mm.init(cl_file);
+            mm.prepare(mat1, mat2, PITCH);
+            for (int i = 0; i < 10; ++i)
+                std::cout
+                    << "run time        : "
+                    << mm.run(result).count()
+                    << std::endl;
+        }
     } catch (std::exception& ex) {
         std::cerr << "exception (std) : " << ex.what() << std::endl;
         return -1;
