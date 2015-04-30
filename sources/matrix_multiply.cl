@@ -40,10 +40,9 @@ kernel void matrix_multiply(
     }
 }
 
-#define BLOCK_SIZE 8
+#define BLOCK_SIZE 16
 
-kernel __attribute__((reqd_work_group_size(BLOCK_SIZE, BLOCK_SIZE, 1)))
-void matrix_multiply_block(
+kernel void matrix_multiply_block(
     global float* mat1,
     global float* mat2,
     global float* result,

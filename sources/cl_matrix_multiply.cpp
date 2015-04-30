@@ -145,7 +145,7 @@ std::chrono::duration<double> cl_matrix_multiply::run(std::vector<float>& out) {
         kernel_,
         cl::NullRange,
         cl::NDRange(mat1_size_ / pitch_, mat2_size_ / pitch_),
-        cl::NDRange(8, 8),
+        cl::NDRange(16, 16),
         nullptr,
         &event_);
     queue_.finish();
