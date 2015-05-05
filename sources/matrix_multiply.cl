@@ -57,9 +57,8 @@ kernel void matrix_multiply_block(
     //matrices dimensions
     int p = get_global_size(0);
     int r = get_global_size(1);
-    const int qq = pitch;
     // number of submatrices to be processes by each worker (Q dimension)
-    int numSubMat = qq / BLOCK_SIZE;
+    const int numSubMat = pitch / BLOCK_SIZE;
     float4 resp = (float4)(0, 0, 0, 0);
     local float A[BLOCK_SIZE][BLOCK_SIZE];
     local float B[BLOCK_SIZE][BLOCK_SIZE];
@@ -67,7 +66,7 @@ kernel void matrix_multiply_block(
         // copy submatrices to local memory. each worker copies one element
         // Notice that A[i,k] accesses element starting from M[BLOCK_SIZE * i, BLOCK_SIZE * j]
         A[idX][idY] = mat1[BLOCK_SIZE*i + idX + p*(BLOCK_SIZE*k+idY)];
-        B[idX][idY] = mat2[BLOCK_SIZE*k + idX + qq*(BLOCK_SIZE*j+idY)];
+        B[idX][idY] = mat2[BLOCK_SIZE*k + idX + pitch*(BLOCK_SIZE*j+idY)];
         barrier(CLK_LOCAL_MEM_FENCE);
         for (int k2 = 0; k2 < BLOCK_SIZE; k2+=4)
         {
